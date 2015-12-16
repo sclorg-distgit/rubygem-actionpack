@@ -1,0 +1,38 @@
+From 9e625d64656556ac30172ce5bcc800da463dd777 Mon Sep 17 00:00:00 2001
+From: Tobias Kraze <tobias@kraze.eu>
+Date: Wed, 4 Dec 2013 12:16:05 +0100
+Subject: [PATCH] repair a test broken by the number_to_currency XSS fix
+
+---
+ actionpack/test/template/number_helper_i18n_test.rb | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/actionpack/test/template/number_helper_i18n_test.rb b/actionpack/test/template/number_helper_i18n_test.rb
+index d6e9de9..4710cbf 100644
+--- a/actionpack/test/template/number_helper_i18n_test.rb
++++ b/actionpack/test/template/number_helper_i18n_test.rb
+@@ -7,7 +7,7 @@ def setup
+     I18n.backend.store_translations 'ts',
+       :number => {
+         :format => { :precision => 3, :delimiter => ',', :separator => '.', :significant => false, :strip_insignificant_zeros => false },
+-        :currency => { :format => { :unit => '&$', :format => '%u - %n', :negative_format => '(%u - %n)', :precision => 2 } },
++        :currency => { :format => { :unit => '$$$', :format => '%u - %n', :negative_format => '(%u - %n)', :precision => 2 } },
+         :human => {
+           :format => {
+             :precision => 2,
+@@ -42,9 +42,9 @@ def setup
+   end
+ 
+   def test_number_to_i18n_currency
+-    assert_equal("&$ - 10.00", number_to_currency(10, :locale => 'ts'))
+-    assert_equal("(&$ - 10.00)", number_to_currency(-10, :locale => 'ts'))
+-    assert_equal("-10.00 - &$", number_to_currency(-10, :locale => 'ts', :format => "%n - %u"))
++    assert_equal("$$$ - 10.00", number_to_currency(10, :locale => 'ts'))
++    assert_equal("($$$ - 10.00)", number_to_currency(-10, :locale => 'ts'))
++    assert_equal("-10.00 - $$$", number_to_currency(-10, :locale => 'ts', :format => "%n - %u"))
+   end
+ 
+   def test_number_to_currency_with_clean_i18n_settings
+-- 
+1.8.5.1
+
