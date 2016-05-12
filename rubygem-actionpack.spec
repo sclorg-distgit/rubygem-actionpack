@@ -9,13 +9,13 @@
 %{!?scl_nodejs:%global scl_nodejs rh-nodejs4}
 %{!?scl_prefix_nodejs:%global scl_prefix_nodejs %{scl_nodejs}-}
 
-%global bootstrap 0
+%global bootstrap 1
 
 Summary: Web-flow and rendering framework putting the VC in MVC
 Name: %{?scl_prefix}rubygem-%{gem_name}
 Epoch: 1
-Version: 4.2.5.1
-Release: 7%{?dist}
+Version: 4.2.6
+Release: 1%{?dist}
 Group: Development/Languages
 License: MIT
 URL: http://www.rubyonrails.org
@@ -25,8 +25,8 @@ Source0: http://rubygems.org/downloads/actionpack-%{version}.gem
 # You may check it out like so
 # git clone http://github.com/rails/rails.git
 # cd rails/actionpack/
-# git checkout v4.1.0
-# tar czvf actionpack-4.2.5.1-tests.tgz test/
+# git checkout v4.2.6
+# tar czvf actionpack-4.2.6-tests.tgz test/
 Source2: actionpack-%{version}-tests.tgz
 
 # Let's keep Requires and BuildRequires sorted alphabeticaly
@@ -130,8 +130,7 @@ sed -i "1i\require 'rack/test'" lib/action_controller/metal/strong_parameters.rb
 
 # One test is failing. Investigate.
 %{?scl:scl enable %{scl} %{scl_nodejs} - << \EOF}
-ruby -w -I.:lib:test -rtimeout -e 'Dir.glob("test/{abstract,controller,dispatch,template}/**/*_test.rb").each {|t| require t}' | \
-grep " assertions, 1 failures, "
+ruby -w -I.:lib:test -rtimeout -e 'Dir.glob("test/{abstract,controller,dispatch,template}/**/*_test.rb").each {|t| require t}'
 %{?scl:EOF}
 popd
 %endif
@@ -150,6 +149,9 @@ popd
 %{gem_instdir}/test/
 
 %changelog
+* Mon Apr 04 2016 Pavel Valena <pvalena@redhat.com> - 1:4.2.6-1
+- Update to 4.2.6
+
 * Mon Feb 29 2016 Pavel Valena <pvalena@redhat.com> - 1:4.2.5.1-7
 - Allow one failing test
 
