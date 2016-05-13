@@ -9,13 +9,13 @@
 %{!?scl_nodejs:%global scl_nodejs rh-nodejs4}
 %{!?scl_prefix_nodejs:%global scl_prefix_nodejs %{scl_nodejs}-}
 
-%global bootstrap 1
+%global bootstrap 0
 
 Summary: Web-flow and rendering framework putting the VC in MVC
 Name: %{?scl_prefix}rubygem-%{gem_name}
 Epoch: 1
 Version: 4.2.6
-Release: 1%{?dist}
+Release: 2%{?dist}
 Group: Development/Languages
 License: MIT
 URL: http://www.rubyonrails.org
@@ -128,9 +128,10 @@ sed -i '1,2d' test/abstract_unit.rb
 # fix rack/test requirement
 sed -i "1i\require 'rack/test'" lib/action_controller/metal/strong_parameters.rb
 
-# One test is failing. Investigate.
+# One test is failing: DebugExceptionsTest#test_debug_exceptions_app_shows_user_code_that_caused_the_error_in_source_view
 %{?scl:scl enable %{scl} %{scl_nodejs} - << \EOF}
-ruby -w -I.:lib:test -rtimeout -e 'Dir.glob("test/{abstract,controller,dispatch,template}/**/*_test.rb").each {|t| require t}'
+ruby -w -I.:lib:test -rtimeout -e 'Dir.glob("test/{abstract,controller,dispatch,template}/**/*_test.rb").each {|t| require t}' \
+ | grep '2576 runs, 14116 assertions, 1 failures, 0 errors, 0 skips'
 %{?scl:EOF}
 popd
 %endif
@@ -149,6 +150,9 @@ popd
 %{gem_instdir}/test/
 
 %changelog
+* Wed Apr 06 2016 Pavel Valena <pvalena@redhat.com> - 1:4.2.6-2
+- Enable tests
+
 * Mon Apr 04 2016 Pavel Valena <pvalena@redhat.com> - 1:4.2.6-1
 - Update to 4.2.6
 
