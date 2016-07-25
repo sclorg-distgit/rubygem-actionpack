@@ -9,7 +9,7 @@ Summary: Web-flow and rendering framework putting the VC in MVC
 Name: %{?scl_prefix}rubygem-%{gem_name}
 Epoch: 1
 Version: 4.1.5
-Release: 2%{?dist}
+Release: 4%{?dist}
 Group: Development/Languages
 License: MIT
 URL: http://www.rubyonrails.org
@@ -22,6 +22,27 @@ Source0: http://rubygems.org/downloads/actionpack-%{version}.gem
 # git checkout v4.1.5
 # tar czvf actionpack-4.1.5-tests.tgz test/
 Source2: actionpack-%{version}-tests.tgz
+
+# Fix CVE-2015-7576 Timing attack vulnerability in basic authentication
+# https://bugzilla.redhat.com/show_bug.cgi?id=1301933
+Patch0: rubygem-actionpack-4.1.14.1-CVE-2015-7576-fix-timing-attack-vulnerability.patch
+# Fix CVE-2016-0751 Possible Object Leak and Denial of Service attack
+# https://bugzilla.redhat.com/show_bug.cgi?id=1301946
+Patch1: rubygem-actionpack-4.1.14.1-CVE-2016-0751-fix-possible-object-leak-and-denial-of-service-attack.patch
+# Fix CVE-2016-0752 Possible Information Leak Vulnerability
+# https://bugzilla.redhat.com/show_bug.cgi?id=1301963
+Patch2: rubygem-actionpack-4.1.14.1-CVE-2016-0752-fix-possible-information-leak-vulnerability.patch
+# Fix CVE-2015-7581 Object leak vulnerability for wildcard controller routes
+# https://bugzilla.redhat.com/show_bug.cgi?id=1301981
+Patch3: rubygem-actionpack-4.1.14.1-CVE-2015-7581-fix-object-leak-vulnerability-for-wildcard-controller-routes.patch
+
+# Fix CVE-2016-2097: Directory traversal and information leak.
+# https://bugzilla.redhat.com/show_bug.cgi?id=1310043
+Patch4: rubygem-actionpack-4.1.14.2-CVE-2016-2097-render_data_leak_2.patch
+
+# Fix CVE-2016-2098: Code injection vulnerability.
+# https://bugzilla.redhat.com/show_bug.cgi?id=1310054
+Patch5: rubygem-actionpack-4.1.14.2-secure_inline_with_params.patch
 
 # Let's keep Requires and BuildRequires sorted alphabeticaly
 Requires: %{?scl_prefix_ruby}ruby(rubygems)
@@ -45,7 +66,7 @@ BuildRequires: %{?scl_prefix}rubygem(rack-test) >= 0.6.2
 BuildRequires: %{?scl_prefix}rubygem(rack-test) < 0.7
 BuildRequires: %{?scl_prefix}rubygem(sqlite3)
 BuildRequires: %{?scl_prefix}rubygem(therubyracer)
-BuildRequires: v8314-v8
+BuildRequires: %{?scl_prefix_v8}v8
 BuildRequires: %{?scl_prefix}rubygem(tzinfo)
 BuildRequires: %{?scl_prefix}rubygem(uglifier)
 BuildArch: noarch
@@ -72,6 +93,15 @@ Documentation for %{pkg_name}
 
 # move the tests into place
 tar xzvf %{SOURCE2} -C .%{gem_instdir}
+
+pushd .%{gem_instdir}
+%patch0 -p2
+%patch1 -p2
+%patch2 -p2
+%patch3 -p2
+%patch4 -p2
+%patch5 -p2
+popd
 
 # Remove backup files
 # No! these are needed for rake test
@@ -147,6 +177,22 @@ popd
 %{gem_instdir}/test/
 
 %changelog
+* Mon Mar 07 2016 Vít Ondruch <vondruch@redhat.com> - 1:4.1.5-4
+- Fix directory traversal and information leak.
+  Resolves: CVE-2016-2097
+- Fix code injection vulnerability.
+  Resolves: CVE-2016-2098
+
+* Thu Feb 11 2016 Pavel Valena <pvalena@redhat.com> - 1:4.1.5-3
+- Fix Timing attack vulnerability in Action Controller - rhbz#1301933
+  - Resolves: CVE-2015-7576
+- Fix Possible Object Leak and Denial of Service attack - rhbz#1301946
+  - Resolves: CVE-2016-0751
+- Fix Possible Information Leak Vulnerability - rhbz#1301963
+  - Resolves: CVE-2016-0752
+- Fix Object leak vulnerability for wildcard controller routes - rhbz#1301981
+  - Resolves: CVE-2015-7581
+
 * Thu Feb 05 2015 Vít Ondruch <vondruch@redhat.com> - 1:4.1.5-2
 - Remove obsolete patch.
 
