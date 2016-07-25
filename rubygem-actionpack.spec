@@ -9,7 +9,7 @@ Summary: Web-flow and rendering framework putting the VC in MVC
 Name: %{?scl_prefix}rubygem-%{gem_name}
 Epoch: 1
 Version: 4.0.2
-Release: 4%{?dist}
+Release: 7%{?dist}
 Group: Development/Languages
 License: MIT
 URL: http://www.rubyonrails.org
@@ -28,6 +28,25 @@ Patch0: rubygem-actionpack-enable-test.patch
 Patch1: rubygem-actionpack-4.0.3-CVE-2014-0081-XSS-vulnerability.patch
 # Fix for CVE-2014-0130
 Patch2: rubygem-actionpack-4.0.5-CVE-2014-0130-avoid-dir-traversal.patch
+
+# Fix CVE-2015-7576 Timing attack vulnerability in basic authentication
+# https://bugzilla.redhat.com/show_bug.cgi?id=1301933
+Patch3: rubygem-actionpack-4.1.14.1-CVE-2015-7576-fix-timing-attack-vulnerability.patch
+# Fix CVE-2016-0751 Possible Object Leak and Denial of Service attack
+# https://bugzilla.redhat.com/show_bug.cgi?id=1301946
+Patch4: rubygem-actionpack-4.1.14.1-CVE-2016-0751-fix-possible-object-leak-and-denial-of-service-attack.patch
+# Fix CVE-2016-0752 Possible Information Leak Vulnerability
+# https://bugzilla.redhat.com/show_bug.cgi?id=1301963
+Patch5: rubygem-actionpack-4.1.14.1-CVE-2016-0752-fix-possible-information-leak-vulnerability.patch
+# Fix CVE-2015-7581 Object leak vulnerability for wildcard controller routes
+# https://bugzilla.redhat.com/show_bug.cgi?id=1301981
+Patch6: rubygem-actionpack-4.1.14.1-CVE-2015-7581-fix-object-leak-vulnerability-for-wildcard-controller-routes.patch
+# Fix CVE-2016-2097: Directory traversal and information leak in Action View
+# https://bugzilla.redhat.com/show_bug.cgi?id=1310043
+Patch7: rubygem-actionpack-4.1.14.2-CVE-2016-2097-render_data_leak_2.patch
+# Fix CVE-2016-2098: Code injection vulnerability.
+# https://bugzilla.redhat.com/show_bug.cgi?id=1310054
+Patch8: rubygem-actionpack-4.1.14.2-CVE-2016-2098-secure_inline_with_params.patch
 
 # Let's keep Requires and BuildRequires sorted alphabeticaly
 Requires: %{?scl_prefix_ruby}ruby(rubygems)
@@ -97,6 +116,12 @@ pushd .%{gem_instdir}
 %patch0 -p0
 %patch1 -p1
 %patch2 -p1
+%patch3 -p2
+%patch4 -p2
+%patch5 -p2
+%patch6 -p2
+%patch7 -p2
+%patch8 -p2
 popd
 
 # Remove backup files
@@ -169,6 +194,28 @@ popd
 %{gem_instdir}/test/
 
 %changelog
+* Tue Mar 08 2016 Vít Ondruch <vondruch@redhat.com> - 1:4.0.2-7
+- Update the CVE-2016-2097 patch to the latest upstream version.
+  Related: CVE-2016-2097
+- Update the CVE-2016-2098 patch to the latest upstream version.
+  Related: CVE-2016-2098
+
+* Wed Feb 24 2016 Vít Ondruch <vondruch@redhat.com> - 1:4.1.5-6
+- Fix Directory traversal and information leak in Action View.
+  Resolves: CVE-2016-2097
+- Fix code injection vulnerability.
+  Resolves: CVE-2016-2098
+
+* Tue Feb 23 2016 Vít Ondruch <vondruch@redhat.com> - 1:4.1.5-5
+- Fix Timing attack vulnerability in Action Controller.
+  Resolves: CVE-2015-7576
+- Fix Possible Object Leak and Denial of Service attack.
+  Resolves: CVE-2016-0751
+- Fix Possible Information Leak Vulnerability.
+  Resolves: CVE-2016-0752
+- Fix Object leak vulnerability for wildcard controller routes.
+  Resolves: CVE-2015-7581
+
 * Wed May 07 2014 Josef Stribny <jstribny@redhat.com> - 1:4.0.2-4
 - Fix for CVE-2014-0130
   - Resolves: rhbz#1095172
