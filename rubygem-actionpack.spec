@@ -10,7 +10,7 @@ Summary: Web-flow and rendering framework putting the VC in MVC
 Name: %{?scl_prefix}rubygem-%{gem_name}
 Epoch: 1
 Version: 3.2.8
-Release: 13%{?dist}
+Release: 16%{?dist}
 Group: Development/Languages
 License: MIT
 URL: http://www.rubyonrails.org
@@ -70,6 +70,26 @@ Patch12: rubygem-actionpack-3.2.17-CVE-2014-0082-dos.patch
 
 # Fix for CVE-2014-0130
 Patch13: rubygem-actionpack-3.2.18-CVE-2014-0130-avoid-dir-traversal.patch
+
+# Fix CVE-2015-7576 Timing attack vulnerability in basic authentication
+# https://bugzilla.redhat.com/show_bug.cgi?id=1301933
+Patch14: rubygem-actionpack-3.2.22.1-CVE-2015-7576-fix-timing-attack-vulnerability.patch
+
+# Fix CVE-2016-0751 Possible Object Leak and Denial of Service attack
+# https://bugzilla.redhat.com/show_bug.cgi?id=1301946
+Patch15: rubygem-actionpack-3.2.22.1-CVE-2016-0751-fix-possible-object-leak-and-denial-of-service-attack.patch
+
+# Fix CVE-2016-0752 Possible Information Leak Vulnerability
+# https://bugzilla.redhat.com/show_bug.cgi?id=1301963
+Patch16: rubygem-actionpack-3.2.22.1-CVE-2016-0752-fix-possible-information-leak-vulnerability.patch
+
+# Fix CVE-2016-2097: Directory traversal and information leak in Action View
+# https://bugzilla.redhat.com/show_bug.cgi?id=1310043
+Patch17: rubygem-actionpack-3.2.22.2-render_data_leak_2.patch
+
+# Fix CVE-2016-2098: Code injection vulnerability.
+# https://bugzilla.redhat.com/show_bug.cgi?id=1310054
+Patch18: rubygem-actionpack-3.2.22.2-secure_inline_with_params.patch
 
 # Let's keep Requires and BuildRequires sorted alphabeticaly
 Requires: %{?scl_prefix}ruby(rubygems)
@@ -155,6 +175,11 @@ pushd .%{gem_instdir}
 %patch11 -p1
 %patch12 -p1
 %patch13 -p2
+%patch14 -p2
+%patch15 -p2
+%patch16 -p2
+%patch17 -p2
+%patch18 -p2
 
 # create missing symlink
 pushd test/fixtures/layout_tests/layouts/
@@ -225,6 +250,26 @@ popd
 %{gem_instdir}/test/
 
 %changelog
+* Tue Mar 08 2016 Vít Ondruch <vondruch@redhat.com> - 1:3.2.8-16
+- Update the CVE-2016-2097 to the latest upstream version.
+  Related: CVE-2016-2097
+- Update the CVE-2016-2098 patch to the latest upstream version.
+  Related: CVE-2016-2098
+
+* Wed Feb 24 2016 Vít Ondruch <vondruch@redhat.com> - 1:3.2.8-15
+- Fix Directory traversal and information leak in Action View.
+  Resolves: CVE-2016-2097
+- Fix code injection vulnerability.
+  Resolves: CVE-2016-2098
+
+* Tue Feb 23 2016 Vít Ondruch <vondruch@redhat.com> - 1:3.2.8-14
+- Fix Timing attack vulnerability in Action Controller.
+  Resolves: CVE-2015-7576
+- Fix Possible Object Leak and Denial of Service attack.
+  Resolves: CVE-2016-0751
+- Fix Possible Information Leak Vulnerability.
+  Resolves: CVE-2016-0752
+
 * Wed May 14 2014 Vít Ondruch <vondruch@redhat.com> - 1:3.2.8-13
 - Fixes for CVE-2014-0130
   - Resolves: rhbz#1096086
