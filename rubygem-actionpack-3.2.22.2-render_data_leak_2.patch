@@ -1,0 +1,388 @@
+From 0b0573f2818d9fc7fcd28bd8e64bf3700b8107ff Mon Sep 17 00:00:00 2001
+From: Arthur Neves <arthurnn@gmail.com>
+Date: Tue, 2 Feb 2016 12:34:11 -0500
+Subject: [PATCH] Complete work on 3.2 for render_data_leak patch.
+
+The first patch, trying to fix this, was actually not fixing it. And we
+didnt catch that as the tests were not inside a TestCase subclass.
+The idea of this patch is still the same:
+We should allow :file to be outside rails root, but anything else must
+be inside the rails view directory.
+
+The implementation has changed a bit though. Now the patch is way
+similar with the 4.x series patches.
+When `render 'foo/bar'` , this will now add that file in the options
+hash as a different key, and not :file, so when we look up that file, we
+dont set the fallbacks, and only lookup a template, to constraint the
+folders that can access.
+---
+ actionpack/lib/abstract_controller/rendering.rb    |  3 +-
+ actionpack/lib/action_view/lookup_context.rb       |  4 ++
+ actionpack/lib/action_view/path_set.rb             | 26 +++++++---
+ .../lib/action_view/renderer/abstract_renderer.rb  |  2 +-
+ .../lib/action_view/renderer/template_renderer.rb  |  5 +-
+ actionpack/lib/action_view/template/resolver.rb    | 33 ++++++-----
+ actionpack/lib/action_view/testing/resolvers.rb    |  5 +-
+ .../test/controller/new_base/render_file_test.rb   | 49 -------------------
+ actionpack/test/controller/render_test.rb          | 56 +++++++++++-----------
+ 9 files changed, 79 insertions(+), 104 deletions(-)
+
+diff --git a/actionpack/lib/abstract_controller/rendering.rb b/actionpack/lib/abstract_controller/rendering.rb
+index f74fd6a..5b45a13 100644
+--- a/actionpack/lib/abstract_controller/rendering.rb
++++ b/actionpack/lib/abstract_controller/rendering.rb
+@@ -147,12 +147,11 @@ module AbstractController
+         options = action
+       when String, Symbol
+         action = action.to_s
+-        key = action.include?(?/) ? :file : :action
++        key = action.include?(?/) ? :app_template_file : :action
+         options[key] = action
+       else
+         options[:partial] = action
+       end
+-
+       options
+     end
+ 
+diff --git a/actionpack/lib/action_view/lookup_context.rb b/actionpack/lib/action_view/lookup_context.rb
+index 9331d13..91ca4a7 100644
+--- a/actionpack/lib/action_view/lookup_context.rb
++++ b/actionpack/lib/action_view/lookup_context.rb
+@@ -121,6 +121,10 @@ module ActionView
+         @view_paths.find_all(*args_for_lookup(name, prefixes, partial, keys, options))
+       end
+ 
++      def find_file(name, prefixes = [], partial = false, keys = [], options = {})
++        @view_paths.find_file(*args_for_lookup(name, prefixes, partial, keys, options))
++      end
++
+       def exists?(name, prefixes = [], partial = false, keys = [], options = {})
+         @view_paths.exists?(*args_for_lookup(name, prefixes, partial, keys, options))
+       end
+diff --git a/actionpack/lib/action_view/path_set.rb b/actionpack/lib/action_view/path_set.rb
+index bbb1af8..1c54a97 100644
+--- a/actionpack/lib/action_view/path_set.rb
++++ b/actionpack/lib/action_view/path_set.rb
+@@ -58,23 +58,35 @@ module ActionView #:nodoc:
+       find_all(*args).first || raise(MissingTemplate.new(self, *args))
+     end
+ 
++    def find_file(path, prefixes = [], *args)
++      _find_all(path, prefixes, args, true).first || raise(MissingTemplate.new(self, path, prefixes, *args))
++    end
++
+     def find_all(path, prefixes = [], *args)
++      _find_all path, prefixes, args, false
++    end
++
++    def exists?(path, prefixes, *args)
++      find_all(path, prefixes, *args).any?
++    end
++
++    private
++
++    def _find_all(path, prefixes, args, outside_app)
+       prefixes = [prefixes] if String === prefixes
+       prefixes.each do |prefix|
+         paths.each do |resolver|
+-          templates = resolver.find_all(path, prefix, *args)
++          if outside_app
++            templates = resolver.find_all_anywhere(path, prefix, *args)
++          else
++            templates = resolver.find_all(path, prefix, *args)
++          end
+           return templates unless templates.empty?
+         end
+       end
+       []
+     end
+ 
+-    def exists?(path, prefixes, *args)
+-      find_all(path, prefixes, *args).any?
+-    end
+-
+-    private
+-
+     def typecast(paths)
+       paths.map do |path|
+         case path
+diff --git a/actionpack/lib/action_view/renderer/abstract_renderer.rb b/actionpack/lib/action_view/renderer/abstract_renderer.rb
+index 0b5d378..021fb19 100644
+--- a/actionpack/lib/action_view/renderer/abstract_renderer.rb
++++ b/actionpack/lib/action_view/renderer/abstract_renderer.rb
+@@ -1,6 +1,6 @@
+ module ActionView
+   class AbstractRenderer #:nodoc:
+-    delegate :find_template, :template_exists?, :with_fallbacks, :update_details,
++    delegate :find_template, :find_file, :template_exists?, :with_fallbacks, :update_details,
+       :with_layout_format, :formats, :to => :@lookup_context
+ 
+     def initialize(lookup_context)
+diff --git a/actionpack/lib/action_view/renderer/template_renderer.rb b/actionpack/lib/action_view/renderer/template_renderer.rb
+index a27d5dd..578db36 100644
+--- a/actionpack/lib/action_view/renderer/template_renderer.rb
++++ b/actionpack/lib/action_view/renderer/template_renderer.rb
+@@ -21,11 +21,12 @@ module ActionView
+     # Determine the template to be rendered using the given options.
+     def determine_template(options) #:nodoc:
+       keys = options[:locals].try(:keys) || []
+-
+       if options.key?(:text)
+         Template::Text.new(options[:text], formats.try(:first))
++      elsif options.key?(:app_template_file)
++        find_template(options[:app_template_file], nil, false, keys, @details)
+       elsif options.key?(:file)
+-        with_fallbacks { find_template(options[:file], nil, false, keys, @details) }
++        with_fallbacks { find_file(options[:file], nil, false, keys, @details) }
+       elsif options.key?(:inline)
+         handler = Template.handler_for_extension(options[:type] || "erb")
+         Template.new(options[:inline], "inline template", handler, :locals => keys)
+diff --git a/actionpack/lib/action_view/template/resolver.rb b/actionpack/lib/action_view/template/resolver.rb
+index d3a6d1a..847c946 100644
+--- a/actionpack/lib/action_view/template/resolver.rb
++++ b/actionpack/lib/action_view/template/resolver.rb
+@@ -43,7 +43,13 @@ module ActionView
+     # Normalizes the arguments and passes it on to find_template.
+     def find_all(name, prefix=nil, partial=false, details={}, key=nil, locals=[])
+       cached(key, [name, prefix, partial], details, locals) do
+-        find_templates(name, prefix, partial, details)
++        find_templates(name, prefix, partial, details, false)
++      end
++    end
++
++    def find_all_anywhere(name, prefix, partial=false, details={}, key=nil, locals=[])
++      cached(key, [name, prefix, partial], details, locals) do
++        find_templates(name, prefix, partial, details, true)
+       end
+     end
+ 
+@@ -54,8 +60,8 @@ module ActionView
+     # This is what child classes implement. No defaults are needed
+     # because Resolver guarantees that the arguments are present and
+     # normalized.
+-    def find_templates(name, prefix, partial, details)
+-      raise NotImplementedError, "Subclasses must implement a find_templates(name, prefix, partial, details) method"
++    def find_templates(name, prefix, partial, details, outside_app_allowed = false)
++      raise NotImplementedError, "Subclasses must implement a find_templates(name, prefix, partial, details, outside_app_allowed) method"
+     end
+ 
+     # Helpers that builds a path. Useful for building virtual paths.
+@@ -110,17 +116,16 @@
+       super()
+     end
+ 
+-    cattr_accessor :allow_external_files, instance_reader: false, instance_writer: false
+-    self.allow_external_files = false
++    cattr_accessor :instance_reader => false, :instance_writer => false
+ 
+     private
+ 
+-    def find_templates(name, prefix, partial, details)
++    def find_templates(name, prefix, partial, details, outside_app_allowed = false)
+       path = Path.build(name, prefix, partial)
+-      query(path, details, details[:formats])
++      query(path, details, details[:formats], outside_app_allowed)
+     end
+ 
+-    def query(path, details, formats)
++    def query(path, details, formats, outside_app_allowed)
+       query = build_query(path, details)
+ 
+       # deals with case-insensitive file systems.
+@@ -131,9 +136,7 @@
+           !sanitizer[File.dirname(filename)].include?(filename)
+       }
+ 
+-      unless self.class.allow_external_files
+-        template_paths = reject_files_external_to_app(template_paths)
+-      end
++      template_paths = reject_files_external_to_app(template_paths) unless outside_app_allowed
+ 
+       template_paths.map { |template|
+         handler, format = extract_handler_and_format(template, formats)
+@@ -253,7 +256,12 @@ module ActionView
+   class OptimizedFileSystemResolver < FileSystemResolver #:nodoc:
+     def build_query(path, details)
+       exts = EXTENSIONS.map { |ext| details[ext] }
+-      query = escape_entry(File.join(@path, path))
++
++      if path.starts_with? @path.to_s
++        query = escape_entry(path)
++      else
++        query = escape_entry(File.join(@path, path))
++      end
+ 
+       query + exts.map { |ext|
+         "{#{ext.compact.uniq.map { |e| ".#{e}," }.join}}"
+diff --git a/actionpack/lib/action_view/testing/resolvers.rb b/actionpack/lib/action_view/testing/resolvers.rb
+index 7afa2fa..d552151 100644
+--- a/actionpack/lib/action_view/testing/resolvers.rb
++++ b/actionpack/lib/action_view/testing/resolvers.rb
+@@ -19,7 +19,7 @@ module ActionView #:nodoc:
+ 
+   private
+ 
+-    def query(path, exts, formats)
++    def query(path, exts, formats, outside_app_allowed)
+       query = ""
+       EXTENSIONS.each do |ext|
+         query << '(' << exts[ext].map {|e| e && Regexp.escape(".#{e}") }.join('|') << '|)'
+@@ -40,11 +40,10 @@ module ActionView #:nodoc:
+   end
+ 
+   class NullResolver < PathResolver
+-    def query(path, exts, formats)
++    def query(path, exts, formats, outside_app_allowed)
+       handler, format = extract_handler_and_format(path, formats)
+       [ActionView::Template.new("Template generated by Null Resolver", path, handler, :virtual_path => path, :format => format)]
+     end
+   end
+ 
+ end
+-
+diff --git a/actionpack/test/controller/new_base/render_file_test.rb b/actionpack/test/controller/new_base/render_file_test.rb
+index c0e23db..3fdf7a6 100644
+--- a/actionpack/test/controller/new_base/render_file_test.rb
++++ b/actionpack/test/controller/new_base/render_file_test.rb
+@@ -13,15 +13,6 @@ module RenderFile
+       render :file => File.join(File.dirname(__FILE__), '../../fixtures/test/render_file_with_ivar')
+     end
+ 
+-    def without_file_key
+-      render File.join(File.dirname(__FILE__), *%w[.. .. fixtures test hello_world])
+-    end
+-
+-    def without_file_key_with_instance_variable
+-      @secret = 'in the sauce'
+-      render File.join(File.dirname(__FILE__), '../../fixtures/test/render_file_with_ivar')
+-    end
+-
+     def relative_path
+       @secret = 'in the sauce'
+       render :file => '../../fixtures/test/render_file_with_ivar'
+@@ -41,11 +32,6 @@ module RenderFile
+       path = File.join(File.dirname(__FILE__), '../../fixtures/test/render_file_with_locals')
+       render :file => path, :locals => {:secret => 'in the sauce'}
+     end
+-
+-    def without_file_key_with_locals
+-      path = FIXTURES.join('test/render_file_with_locals').to_s
+-      render path, :locals => {:secret => 'in the sauce'}
+-    end
+   end
+ 
+   class TestBasic < Rack::TestCase
+@@ -61,36 +47,6 @@ module RenderFile
+       assert_response "The secret is in the sauce\n"
+     end
+ 
+-    test "rendering path without specifying the :file key" do
+-      get :without_file_key
+-      assert_response "Hello world!"
+-    end
+-
+-    test "rendering path without specifying the :file key with ivar" do
+-      get :without_file_key_with_instance_variable
+-      assert_response "The secret is in the sauce\n"
+-    end
+-
+-    test "rendering a relative path" do
+-      begin
+-        ActionView::PathResolver.allow_external_files = true
+-        get :relative_path
+-        assert_response "The secret is in the sauce\n"
+-      ensure
+-        ActionView::PathResolver.allow_external_files = false
+-      end
+-    end
+-
+-    test "rendering a relative path with dot" do
+-      begin
+-        ActionView::PathResolver.allow_external_files = true
+-        get :relative_path_with_dot
+-        assert_response "The secret is in the sauce\n"
+-      ensure
+-        ActionView::PathResolver.allow_external_files = false
+-      end
+-    end
+-
+     test "rendering a Pathname" do
+       get :pathname
+       assert_response "The secret is in the sauce\n"
+@@ -100,10 +56,5 @@ module RenderFile
+       get :with_locals
+       assert_response "The secret is in the sauce\n"
+     end
+-
+-    test "rendering path without specifying the :file key with locals" do
+-      get :without_file_key_with_locals
+-      assert_response "The secret is in the sauce\n"
+-    end
+   end
+ end
+diff --git a/actionpack/test/controller/render_test.rb b/actionpack/test/controller/render_test.rb
+index 3555232..bc42c66 100644
+--- a/actionpack/test/controller/render_test.rb
++++ b/actionpack/test/controller/render_test.rb
+@@ -245,21 +245,6 @@ class TestController < ActionController::Base
+     render :inline =>  "<%= action_name %>"
+   end
+ 
+-  def test_dynamic_render_with_file
+-    # This is extremely bad, but should be possible to do.
+-    assert File.exist?(File.join(File.dirname(__FILE__), '../../test/abstract_unit.rb'))
+-    response = get :dynamic_render_with_file, { id: '../\\../test/abstract_unit.rb' }
+-    assert_equal File.read(File.join(File.dirname(__FILE__), '../../test/abstract_unit.rb')),
+-      response.body
+-  end
+-
+-  def test_dynamic_render
+-    assert File.exist?(File.join(File.dirname(__FILE__), '../../test/abstract_unit.rb'))
+-    assert_raises ActionView::MissingTemplate do
+-      get :dynamic_render, { id: '../\\../test/abstract_unit.rb' }
+-    end
+-  end
+-
+   def test_dynamic_render_file_hash
+     assert_raises ArgumentError do
+       get :dynamic_render, { id: { file: '../\\../test/abstract_unit.rb' } }
+@@ -767,6 +752,35 @@ class RenderTest < ActionController::TestCase
+     @controller.logger = Logger.new(nil)
+ 
+     @request.host = "www.nextangle.com"
++    ActionController::Base.view_paths.paths.each(&:clear_cache)
++  end
++
++  def test_dynamic_render_with_file
++    # This is extremely bad, but should be possible to do.
++    assert File.exist?(File.join(File.dirname(__FILE__), '../../test/abstract_unit.rb'))
++    response = get :dynamic_render_with_file, { :id => '../\\../test/abstract_unit.rb' }
++    assert_equal File.read(File.join(File.dirname(__FILE__), '../../test/abstract_unit.rb')),
++      response.body
++  end
++
++  # :ported:
++  def test_dynamic_render_with_absolute_path
++    file = Tempfile.new('name')
++    file.write "secrets!"
++    file.flush
++    assert_raises ActionView::MissingTemplate do
++      get :dynamic_render, { :id => file.path }
++    end
++  ensure
++    file.close
++    file.unlink
++  end
++
++  def test_dynamic_render
++    assert File.exist?(File.join(File.dirname(__FILE__), '../../test/abstract_unit.rb'))
++    assert_raises ActionView::MissingTemplate do
++      get :dynamic_render, { :id => '../\\../test/abstract_unit.rb' }
++    end
+   end
+ 
+   # :ported:
+-- 
+2.5.4 (Apple Git-61)
+
