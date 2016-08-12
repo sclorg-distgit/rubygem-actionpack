@@ -10,7 +10,7 @@ Summary: Web-flow and rendering framework putting the VC in MVC
 Name: %{?scl_prefix}rubygem-%{gem_name}
 Epoch: 1
 Version: 4.2.5.1
-Release: 1%{?dist}
+Release: 2%{?dist}
 Group: Development/Languages
 License: MIT
 URL: http://www.rubyonrails.org
@@ -23,6 +23,9 @@ Source0: http://rubygems.org/downloads/actionpack-%{version}.gem
 # git checkout v4.1.0
 # tar czvf actionpack-4.2.5.1-tests.tgz test/
 Source2: actionpack-%{version}-tests.tgz
+
+# CVE-2016-6317: Fix unsafe query generation risk
+Patch0: 4-2-unsafe-query-generation.patch
 
 # Let's keep Requires and BuildRequires sorted alphabeticaly
 Requires: %{?scl_prefix_ruby}ruby(release)
@@ -84,6 +87,10 @@ Documentation for %{pkg_name}
 # move the tests into place
 tar xzvf %{SOURCE2} -C .%{gem_instdir}
 
+cd .%{gem_instdir}
+%patch0 -p2
+cd -
+
 # Remove backup files
 # No! these are needed for rake test
 # find ./%{gem_instdir} -type f -name "*~" -delete
@@ -141,6 +148,9 @@ popd
 %{gem_instdir}/test/
 
 %changelog
+* Fri Aug 12 2016 Dominic Cleal <dominic@cleal.org> 4.2.5.1-2
+- Patch for CVE-2016-6317
+
 * Mon Feb 08 2016 Dominic Cleal <dcleal@redhat.com> 4.2.5.1-1
 - Update Rails to 4.2.5.1
 
