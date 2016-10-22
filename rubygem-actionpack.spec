@@ -10,7 +10,7 @@ Summary: Web-flow and rendering framework putting the VC in MVC
 Name: %{?scl_prefix}rubygem-%{gem_name}
 Epoch: 1
 Version: 3.2.8
-Release: 20%{?dist}
+Release: 16%{?dist}
 Group: Development/Languages
 License: MIT
 URL: http://www.rubyonrails.org
@@ -90,11 +90,6 @@ Patch17: rubygem-actionpack-3.2.22.2-render_data_leak_2.patch
 # Fix CVE-2016-2098: Code injection vulnerability.
 # https://bugzilla.redhat.com/show_bug.cgi?id=1310054
 Patch18: rubygem-actionpack-3.2.22.2-secure_inline_with_params.patch
-
-# Fix CVE-2016-6316: Fix unsafe query generation risk.
-# https://bugzilla.redhat.com/show_bug.cgi?id=1365008
-Patch19: rubygem-actionpack-3.2.22.4-CVE-2016-6316-attribute-xss.patch
-Patch20: rubygem-actionpack-3.2.22.4-CVE-2016-6316-attribute-xss-tests.patch
 
 # Let's keep Requires and BuildRequires sorted alphabeticaly
 Requires: %{?scl_prefix}ruby(rubygems)
@@ -185,7 +180,6 @@ pushd .%{gem_instdir}
 %patch16 -p2
 %patch17 -p2
 %patch18 -p2
-%patch19 -p2
 
 # create missing symlink
 pushd test/fixtures/layout_tests/layouts/
@@ -226,8 +220,6 @@ cp -a .%{gem_dir}/* %{buildroot}%{gem_dir}
 %check
 pushd .%{gem_instdir}
 
-patch -p2 < %{PATCH20}
-
 # load_path is not available, remove its require.
 sed -i '1,2d' test/abstract_unit.rb
 
@@ -258,10 +250,6 @@ popd
 %{gem_instdir}/test/
 
 %changelog
-* Tue Aug 23 2016 Pavel Valena <pvalena@redhat.com> - 1:3.2.8-20
-- Fix for CVE-2016-6316 cross-site scripting flaw in Action View
-  Resolves: rhbz#1365008
-
 * Tue Mar 08 2016 Vít Ondruch <vondruch@redhat.com> - 1:3.2.8-16
 - Update the CVE-2016-2097 to the latest upstream version.
   Related: CVE-2016-2097
