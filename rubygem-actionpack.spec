@@ -9,7 +9,7 @@ Summary: Web-flow and rendering framework putting the VC in MVC
 Name: %{?scl_prefix}rubygem-%{gem_name}
 Epoch: 1
 Version: 4.0.2
-Release: 7%{?dist}
+Release: 8%{?dist}
 Group: Development/Languages
 License: MIT
 URL: http://www.rubyonrails.org
@@ -47,6 +47,12 @@ Patch7: rubygem-actionpack-4.1.14.2-CVE-2016-2097-render_data_leak_2.patch
 # Fix CVE-2016-2098: Code injection vulnerability.
 # https://bugzilla.redhat.com/show_bug.cgi?id=1310054
 Patch8: rubygem-actionpack-4.1.14.2-CVE-2016-2098-secure_inline_with_params.patch
+# Fix CVE-2016-6316 cross-site scripting flaw in Action View
+# https://bugzilla.redhat.com/show_bug.cgi?id=1365008
+Patch9: rubygem-actionpack-4.2.7.1-CVE-2016-6316-attribute-xss.patch
+Patch10: rubygem-actionpack-4.2.7.1-CVE-2016-6316-attribute-xss-tests.patch
+Patch11: rubygem-actionpack-4.2.7.1-CVE-2016-6316-ensure-values.patch
+Patch12: rubygem-actionpack-4.2.7.1-CVE-2016-6316-ensure-values-tests.patch
 
 # Let's keep Requires and BuildRequires sorted alphabeticaly
 Requires: %{?scl_prefix_ruby}ruby(rubygems)
@@ -122,6 +128,8 @@ pushd .%{gem_instdir}
 %patch6 -p2
 %patch7 -p2
 %patch8 -p2
+%patch9 -p2
+%patch11 -p2
 popd
 
 # Remove backup files
@@ -153,6 +161,9 @@ rm -rf %{buildroot}
 
 %check
 pushd .%{gem_instdir}
+
+patch -F 0 -p2 < %{PATCH10}
+patch -F 0 -p2 < %{PATCH12}
 
 # load_path is not available, remove its require.
 sed -i '1,2d' test/abstract_unit.rb
@@ -194,6 +205,10 @@ popd
 %{gem_instdir}/test/
 
 %changelog
+* Thu Aug 25 2016 Jun Aruga <jaruga@redhat.com> - 1:4.0.2-8
+- Fix CVE-2016-6316 cross-site scripting flaw in Action View
+  Resolves: rhbz#1365008
+
 * Tue Mar 08 2016 Vít Ondruch <vondruch@redhat.com> - 1:4.0.2-7
 - Update the CVE-2016-2097 patch to the latest upstream version.
   Related: CVE-2016-2097
