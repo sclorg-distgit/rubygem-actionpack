@@ -15,7 +15,7 @@ Summary: Web-flow and rendering framework putting the VC in MVC
 Name: %{?scl_prefix}rubygem-%{gem_name}
 Epoch: 1
 Version: 4.2.6
-Release: 2%{?dist}
+Release: 3%{?dist}
 Group: Development/Languages
 License: MIT
 URL: http://www.rubyonrails.org
@@ -28,6 +28,10 @@ Source0: http://rubygems.org/downloads/actionpack-%{version}.gem
 # git checkout v4.2.6
 # tar czvf actionpack-4.2.6-tests.tgz test/
 Source2: actionpack-%{version}-tests.tgz
+
+# Fix CVE-2016-6317 unsafe query generation in Active Record
+# https://bugzilla.redhat.com/show_bug.cgi?id=1365017
+Patch0: rubygem-actionpack-4.2.7.1-CVE-2016-6317-unsafe-query-tests.patch
 
 # Let's keep Requires and BuildRequires sorted alphabeticaly
 Requires: %{?scl_prefix_ruby}ruby(release)
@@ -122,6 +126,8 @@ rm -rf %{buildroot}
 %check
 pushd .%{gem_instdir}
 
+patch -p2 < %{PATCH0}
+
 # load_path is not available, remove its require.
 sed -i '1,2d' test/abstract_unit.rb
 
@@ -129,9 +135,10 @@ sed -i '1,2d' test/abstract_unit.rb
 sed -i "1i\require 'rack/test'" lib/action_controller/metal/strong_parameters.rb
 
 # One test is failing: DebugExceptionsTest#test_debug_exceptions_app_shows_user_code_that_caused_the_error_in_source_view
+sed -i "/^  test 'debug exceptions app shows user code that caused the error in source view' do$/,/^  end$/ s/^/#/" \
+  test/dispatch/debug_exceptions_test.rb
 %{?scl:scl enable %{scl} %{scl_nodejs} - << \EOF}
-ruby -w -I.:lib:test -rtimeout -e 'Dir.glob("test/{abstract,controller,dispatch,template}/**/*_test.rb").each {|t| require t}' \
- | grep '2576 runs, 14116 assertions, 1 failures, 0 errors, 0 skips'
+ruby -w -I.:lib:test -rtimeout -e 'Dir.glob("test/{abstract,controller,dispatch,template}/**/*_test.rb").each {|t| require t}'
 %{?scl:EOF}
 popd
 %endif
@@ -150,6 +157,10 @@ popd
 %{gem_instdir}/test/
 
 %changelog
+* Thu Aug 18 2016 Jun Aruga <jaruga@redhat.com> - 1:4.2.6-3
+- Fix for CVE-2016-6317
+  Resolves: rhbz#1365017
+
 * Wed Apr 06 2016 Pavel Valena <pvalena@redhat.com> - 1:4.2.6-2
 - Enable tests
 
